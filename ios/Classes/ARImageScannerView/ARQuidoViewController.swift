@@ -25,11 +25,13 @@ class ARQuidoViewController: UIViewController {
     private var wasCameraInitialized = false
     private var isResettingTracking = false
     private let referenceImageNames: Array<String>
+    private let referenceVideoNames: Array<String>
     private let methodChannel: FlutterMethodChannel
     private var detectedImageNode: SCNNode?
     
-    init(referenceImageNames: Array<String>, methodChannel channel: FlutterMethodChannel) {
+    init(referenceImageNames: Array<String>, referenceVideoNames: Array<String>, methodChannel channel: FlutterMethodChannel) {
         self.referenceImageNames = referenceImageNames
+        self.referenceVideoNames = referenceVideoNames
         self.methodChannel = channel
         super.init(nibName: nil, bundle: nil)
     }
@@ -86,68 +88,84 @@ class ARQuidoViewController: UIViewController {
         }
         isResettingTracking = true
         DispatchQueue.global(qos: .userInteractive).async {
-            var referenceImages = [ARReferenceImage]()
-            for imageName in self.referenceImageNames {
-                let imageKey = FlutterDartProject.lookupKey(forAsset: "assets/reference_images/\(imageName).jpg")
-                let imagePath = Bundle.main.path(forResource: imageKey, ofType: nil)
-                let image = UIImage(named: imagePath!, in: Bundle.main, compatibleWith: nil)
-                let referenceImage = ARReferenceImage(image!.cgImage!, orientation: .up, physicalWidth: 0.5)
-                referenceImage.name = imageName
-                referenceImages.append(referenceImage)
+            _ = [ARReferenceImage]()
+            for _ in self.referenceImageNames {
+                var referenceImages = [ARReferenceImage]()
+                for imagePath in self.referenceImageNames { // Assuming this now contains file paths
+                    // Directly use the file path without looking it up from the bundle
+                    guard let image = UIImage(contentsOfFile: imagePath) else {
+                        print("Warning: UIImage could not be created for imagePath: \(imagePath)")
+                        continue
+                    }
+                    guard let cgImage = image.cgImage else {
+                        print("Warning: cgImage could not be obtained from UIImage")
+                        continue
+                    }
+                    
+                    let physicalSize: CGFloat = 0.5
+                    let referenceImage = ARReferenceImage(cgImage, orientation: .up, physicalWidth: physicalSize)
+                    referenceImage.name = URL(fileURLWithPath: imagePath).lastPathComponent
+                    referenceImages.append(referenceImage)
+                }
+                let configuration = ARWorldTrackingConfiguration()
+                configuration.detectionImages = Set(referenceImages)
+                configuration.maximumNumberOfTrackedImages = 10
+                self.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
+                if (!self.wasCameraInitialized) {
+                    self.onRecognitionStarted()
+                    self.wasCameraInitialized = true
+                } else {
+                    self.onRecognitionResumed()
+                }
+                self.isResettingTracking = false
             }
-            
-            let configuration = ARWorldTrackingConfiguration()
-            configuration.detectionImages = Set(referenceImages)
-            configuration.maximumNumberOfTrackedImages = 1
-            self.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
-            if (!self.wasCameraInitialized) {
-                self.onRecognitionStarted()
-                self.wasCameraInitialized = true
-            } else {
-                self.onRecognitionResumed()
-            }
-            self.isResettingTracking = false
         }
     }
 }
 
 extension ARQuidoViewController: ARSCNViewDelegate {
-    
     func renderer(_ renderer: SCNSceneRenderer, didAdd node: SCNNode, for anchor: ARAnchor) {
         guard let imageAnchor = anchor as? ARImageAnchor else { return }
-        if let nodeToRemove = detectedImageNode {
-            nodeToRemove.removeFromParentNode()
-        }
         
-        let referenceImage = imageAnchor.referenceImage
-        let imageName = referenceImage.name ?? ""
-        updateQueue.async {
-            let plane = SCNBox(width: referenceImage.physicalSize.width, height: referenceImage.physicalSize.height, length: 0.3, chamferRadius: 0.01)
-            let planeNode = SCNNode(geometry: plane)
-            planeNode.name = imageName
-            planeNode.opacity = 0.75
-            planeNode.geometry?.firstMaterial?.diffuse.contents = UIColor(red: 205 / 255, green: 207 / 255, blue: 1.0, alpha: 1.0)
-            //rotate plane to match assumed image orientation
-            planeNode.eulerAngles.x = -.pi / 2
-            planeNode.runAction(self.imageHighlightAction)
-            node.addChildNode(planeNode)
-            self.detectedImageNode = planeNode
-        }
+        // Fetch the video path for the detected image
+         let videoPath = self.fetchVideoPath(forImageNamed: imageAnchor.referenceImage.name ?? "")
+         // Use URL(fileURLWithPath:) for local file paths
+         let videoURL = URL(fileURLWithPath: videoPath)
+
+         // Create an AVPlayer with the video URL
+         let player = AVPlayer(url: videoURL)
+         let videoNode = SKVideoNode(avPlayer: player)
         
-        DispatchQueue.main.async {
-            self.onDetect(imageKey: imageName)
-        }
+        // Create an SKScene to hold the SKVideoNode
+        let videoScene = SKScene(size: CGSize(width: 720, height: 1280))
+        videoScene.addChild(videoNode)
+        
+        // Position the video to play at the center of the scene
+        videoNode.position = CGPoint(x: videoScene.size.width / 2, y: videoScene.size.height / 2)
+        videoNode.size = videoScene.size
+        videoNode.yScale = -1.0 // Invert video playback
+        videoNode.play() // Start playing the video
+        
+        // Create an SCNPlane to serve as the video's display surface matching the image's dimensions
+        let videoPlane = SCNPlane(width: imageAnchor.referenceImage.physicalSize.width, height: imageAnchor.referenceImage.physicalSize.height)
+        videoPlane.firstMaterial?.diffuse.contents = videoScene // Use the SKScene as the diffuse content
+        
+        // Create an SCNNode for the video and add it to the detected node
+        let videoPlaneNode = SCNNode(geometry: videoPlane)
+        videoPlaneNode.eulerAngles.x = -.pi / 2 // Rotate to match image orientation
+        node.addChildNode(videoPlaneNode)
     }
     
-    var imageHighlightAction: SCNAction {
-        return .repeatForever(
-            .sequence([
-                .wait(duration: 0.25),
-                .fadeOpacity(to: 0.85, duration: 0.3),
-                .fadeOpacity(to: 0.15, duration: 0.3),
-            ])
-        )
+    func fetchVideoPath(forImageNamed imageName: String) -> String {
+        // Implement fetching the video path based on the imageName
+        // This is where you integrate with your Flutter code to get the appropriate video path
+        // For this example, just return a placeholder string
+       // return "https://file-examples.com/storage/fe7c2cbe4b65fa8179825d1/2017/04/file_example_MP4_480_1_5MG.mp4"
+       print(referenceVideoNames[0])
+        return referenceVideoNames[0];
     }
+    
+
 }
 
 extension ARQuidoViewController: ARSessionDelegate {
@@ -234,22 +252,32 @@ extension ARQuidoViewController {
 
 extension ARQuidoViewController: ImageRecognitionDelegate {
     func onRecognitionPaused() {
-        methodChannel.invokeMethod("scanner#recognitionPaused", arguments: nil)
+        DispatchQueue.main.async {
+            self.methodChannel.invokeMethod("scanner#recognitionPaused", arguments: nil)
+        }
     }
     
     func onRecognitionResumed() {
-        methodChannel.invokeMethod("scanner#recognitionResumed", arguments: nil)
+        DispatchQueue.main.async {
+            self.methodChannel.invokeMethod("scanner#recognitionResumed", arguments: nil)
+        }
     }
     
     func onRecognitionStarted() {
-        methodChannel.invokeMethod("scanner#start", arguments: [String:Any]())
+        DispatchQueue.main.async {
+            self.methodChannel.invokeMethod("scanner#start", arguments: [String:Any]())
+        }
     }
     
     func onDetect(imageKey: String) {
-        methodChannel.invokeMethod("scanner#onImageDetected", arguments: ["imageName": imageKey])
+        DispatchQueue.main.async {
+            self.methodChannel.invokeMethod("scanner#onImageDetected", arguments: ["imageName": imageKey])
+        }
     }
     
     func onDetectedImageTapped(imageKey: String) {
-        methodChannel.invokeMethod("scanner#onDetectedImageTapped", arguments: ["imageName": imageKey])
+        DispatchQueue.main.async {
+            self.methodChannel.invokeMethod("scanner#onDetectedImageTapped", arguments: ["imageName": imageKey])
+        }
     }
 }
