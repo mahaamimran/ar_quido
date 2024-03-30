@@ -87,17 +87,27 @@ class ARQuidoViewController: UIViewController, ARSCNViewDelegate, ARSessionDeleg
         let player = AVPlayer(url: videoURL)
         let videoNode = SKVideoNode(avPlayer: player)
 
-        player.play()
-        let videoScene = SKScene(size: CGSize(width: 720, height: 1280))
-        videoNode.position = CGPoint(x: videoScene.size.width / 2, y: videoScene.size.height / 2)
-        videoNode.yScale = -1.0 // Invert video playback
+        // Create a SKScene with the size of the image anchor's physical size converted to pixels
+        let physicalSize = imageAnchor.referenceImage.physicalSize
+        let videoSceneSize = CGSize(width: physicalSize.width * 1000, // Convert meters to pixels approximately
+                                    height: physicalSize.height * 1000) // Convert meters to pixels approximately
+        let videoScene = SKScene(size: videoSceneSize)
+        videoScene.scaleMode = .aspectFill // This might help if you decide to preserve aspect ratio instead
+
+        videoNode.position = CGPoint(x: videoSceneSize.width / 2, y: videoSceneSize.height / 2)
+        videoNode.size = videoSceneSize // Make the video node's size match the scene's size
         videoScene.addChild(videoNode)
 
-        let videoPlane = SCNPlane(width: imageAnchor.referenceImage.physicalSize.width, height: imageAnchor.referenceImage.physicalSize.height)
+        let videoPlane = SCNPlane(width: physicalSize.width, height: physicalSize.height)
         videoPlane.firstMaterial?.diffuse.contents = videoScene
         let videoPlaneNode = SCNNode(geometry: videoPlane)
         videoPlaneNode.eulerAngles.x = -.pi / 2
+        videoNode.xScale = -1.0 // Flip horizontally
+        
+        videoPlaneNode.eulerAngles.y = .pi
         node.addChildNode(videoPlaneNode)
+
+        player.play()
 
         // Keep references for cleanup
         players[imageName] = player
@@ -108,6 +118,7 @@ class ARQuidoViewController: UIViewController, ARSCNViewDelegate, ARSessionDeleg
         }
         observers.append(observer)
     }
+
     
     deinit {
         // Cleanup
