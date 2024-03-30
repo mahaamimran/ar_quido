@@ -17,8 +17,8 @@ class ARQuidoView: NSObject, FlutterPlatformView {
         }
         
         let channelName = "plugins.miquido.com/ar_quido"
-        let channel = FlutterMethodChannel(name: channelName, binaryMessenger: messenger)
-        viewController = ARQuidoViewController(referenceImageNames: referenceImageNames, referenceVideoNames: referenceVideoNames, methodChannel: channel)
+        _ = FlutterMethodChannel(name: channelName, binaryMessenger: messenger)
+        viewController = ARQuidoViewController(referenceImageNames: referenceImageNames, referenceVideoNames: referenceVideoNames)
         super.init()
     }
     
