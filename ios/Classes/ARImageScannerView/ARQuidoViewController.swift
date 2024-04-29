@@ -116,7 +116,7 @@ class ARQuidoViewController: UIViewController, ARSCNViewDelegate, ARSessionDeleg
             let watermarkTexture = SKTexture(image: watermarkImage)
             let watermarkNode = SKSpriteNode(texture: watermarkTexture)
             watermarkNode.size = CGSize(width: 100, height: 50)
-            watermarkNode.position = CGPoint(x: 70, y: 50)
+            watermarkNode.position = CGPoint(x: videoSceneSize.width / 2, y: 50)
             videoScene.addChild(watermarkNode)
         }
         let videoPlane = SCNPlane(width: CGFloat(imageAnchor.referenceImage.physicalSize.width), height: CGFloat(imageAnchor.referenceImage.physicalSize.height))
