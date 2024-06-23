@@ -89,6 +89,8 @@ abstract class ARQuidoPlatform extends PlatformInterface {
   Widget buildView(
     PlatformViewCreatedCallback onPlatformViewCreated, {
     required List<String> referenceImageNames,
+    required List<String> referenceVideoNames,
+    required bool showLogo,
   }) {
     throw UnimplementedError('buildView() has not been implemented.');
   }

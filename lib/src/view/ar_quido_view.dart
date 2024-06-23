@@ -7,6 +7,8 @@ class ARQuidoView extends StatefulWidget {
   /// recognition.
   const ARQuidoView({
     required this.referenceImageNames,
+    required this.referenceVideoNames,
+    required this.showLogo,
     required this.onImageDetected,
     this.onDetectedImageTapped,
     this.onViewCreated,
@@ -25,6 +27,8 @@ class ARQuidoView extends StatefulWidget {
   ///
   /// Only `.jpg` image files are supported at this time.
   final List<String> referenceImageNames;
+  final List<String> referenceVideoNames;
+  final bool showLogo;
 
   /// Callback method for when the view is ready to be used.
   ///
@@ -80,6 +84,8 @@ class ARQuidoViewState extends State<ARQuidoView> {
     return ARQuidoPlatform.instance.buildView(
       _onPlatformViewCreated,
       referenceImageNames: widget.referenceImageNames,
+      referenceVideoNames: widget.referenceVideoNames,
+      showLogo: widget.showLogo,
     );
   }
 }
