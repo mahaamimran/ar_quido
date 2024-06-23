@@ -69,8 +69,10 @@ class ARQuidoMethodChannel extends ARQuidoPlatform {
   Widget buildView(
     PlatformViewCreatedCallback onPlatformViewCreated, {
     required List<String> referenceImageNames,
+    required List<String> referenceVideoNames,
+    required bool showLogo,
   }) {
-    final creationParams = _buildCreationParams(referenceImageNames);
+    final creationParams = _buildCreationParams(referenceImageNames, referenceVideoNames, showLogo);
     return switch (defaultTargetPlatform) {
       TargetPlatform.android => PlatformViewLink(
           viewType: ARQuidoMethodChannel._androidViewType,
@@ -120,9 +122,12 @@ class ARQuidoMethodChannel extends ARQuidoPlatform {
       ..create();
   }
 
-  Map<String, dynamic> _buildCreationParams(List<String> referenceImageNames) =>
+  Map<String, dynamic> _buildCreationParams(List<String> referenceImageNames,
+          List<String> referenceVideoNames, bool showLogo) =>
       <String, dynamic>{
         'referenceImageNames': referenceImageNames,
+        'referenceVideoNames': referenceVideoNames,
+        'showLogo': showLogo,
       };
 
   Future<void> _handleMethodCall(MethodCall call) async {
